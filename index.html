@@ -124,13 +124,13 @@
         <div class="mb-3">
           <label class="form-label">Location</label>
           <div class="row g-2">
-            <div class="col-4">
+            <div class="col-3">
               <input type="text" class="form-control" id="latitude" placeholder="Latitude" readonly>
             </div>
-            <div class="col-4">
+            <div class="col-3">
               <input type="text" class="form-control" id="longitude" placeholder="Longitude" readonly>
             </div>
-            <div class="col-4">
+            <div class="col-6">
               <input type="text" class="form-control" id="accuracy" placeholder="Accuracy (m)" readonly>
             </div>
           </div>
@@ -227,7 +227,6 @@
         });
         tableBody.appendChild(tr);
       }
-      // Save only the workbookData array (including header) to localStorage
       localStorage.setItem('locationsData', JSON.stringify(workbookData));
     }
     
@@ -242,7 +241,7 @@
     // Initialize Leaflet map to display the captured location
     let map, marker;
     function initMap(lat, lng) {
-      // Ensure numeric values
+      // Convert lat/lng to numbers
       lat = parseFloat(lat);
       lng = parseFloat(lng);
       if(!map) {
@@ -257,6 +256,8 @@
         marker = L.marker([lat, lng]).addTo(map);
       }
       map.setView([lat, lng], 15);
+      // Invalidate map size in case container was hidden
+      setTimeout(() => { if(map) map.invalidateSize(); }, 200);
     }
     
     // Handle Excel file upload if provided by the user
@@ -303,7 +304,7 @@
         const currentDate = new Date().toLocaleString();
         const newRow = [idCategory, idValue, currentDate, latitude, longitude, accuracy];
         
-        // Check if the last row is identical to the new row to avoid duplicates
+        // Check if the last row is identical to avoid duplicates
         if(workbookData.length > 1) {
           const lastRow = workbookData[workbookData.length - 1];
           if(JSON.stringify(lastRow) === JSON.stringify(newRow)) {
@@ -316,7 +317,7 @@
         updateLocationsTable();
         showFeedback('Location captured and added to the Excel data!', 'success');
         
-        // Display the map section and update marker
+        // Show the map section and update marker
         document.getElementById('mapSection').style.display = "block";
         initMap(latitude, longitude);
       }, function(error) {
