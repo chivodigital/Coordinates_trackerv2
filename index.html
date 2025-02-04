@@ -13,7 +13,8 @@
   <!-- SheetJS (XLSX) Library -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <!-- Leaflet CSS for map -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-sA+M3b/2v4ZgkJymj+c+zIBtrHjOAd9Gg4WsM6Pnu9g=" crossorigin=""/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+        integrity="sha256-sA+M3b/2v4ZgkJymj+c+zIBtrHjOAd9Gg4WsM6Pnu9g=" crossorigin=""/>
   <style>
     body {
       background: linear-gradient(135deg, #74ebd5, #ACB6E5);
@@ -151,7 +152,7 @@
       </form>
     </section>
     
-    <!-- Map Section -->
+    <!-- Map Section (initially hidden) -->
     <section id="mapSection" style="display: none;">
       <h5>Location Map</h5>
       <div id="map"></div>
@@ -197,7 +198,9 @@
   <!-- Bootstrap Bundle JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <!-- Leaflet JS for map -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-o9N1j7qST9z3n1qf4o7p2cHfS7kgtKepJDX1pGgInWM=" crossorigin=""></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" 
+          integrity="sha256-o9N1j7qST9z3n1qf4o7p2cHfS7kgtKepJDX1pGgInWM=" 
+          crossorigin=""></script>
   
   <script>
     // Global variable to hold Excel data (2D array for SheetJS)
@@ -238,10 +241,9 @@
       feedbackDiv.innerHTML = `<div class="alert alert-${type} animate__animated animate__fadeIn">${message}</div>`;
     }
     
-    // Initialize Leaflet map to display the captured location
+    // Initialize or update the Leaflet map to display the captured location
     let map, marker;
     function initMap(lat, lng) {
-      // Convert lat/lng to numbers
       lat = parseFloat(lat);
       lng = parseFloat(lng);
       if(!map) {
@@ -256,11 +258,10 @@
         marker = L.marker([lat, lng]).addTo(map);
       }
       map.setView([lat, lng], 15);
-      // Invalidate map size in case container was hidden
-      setTimeout(() => { if(map) map.invalidateSize(); }, 200);
+      setTimeout(() => { if(map) map.invalidateSize(); }, 500);
     }
     
-    // Handle Excel file upload if provided by the user
+    // Handle Excel file upload
     document.getElementById('excelFile').addEventListener('change', function(e) {
       const file = e.target.files[0];
       if (!file) return;
@@ -304,7 +305,7 @@
         const currentDate = new Date().toLocaleString();
         const newRow = [idCategory, idValue, currentDate, latitude, longitude, accuracy];
         
-        // Check if the last row is identical to avoid duplicates
+        // Avoid duplicate entries by comparing with the last row
         if(workbookData.length > 1) {
           const lastRow = workbookData[workbookData.length - 1];
           if(JSON.stringify(lastRow) === JSON.stringify(newRow)) {
@@ -317,15 +318,20 @@
         updateLocationsTable();
         showFeedback('Location captured and added to the Excel data!', 'success');
         
-        // Show the map section and update marker
-        document.getElementById('mapSection').style.display = "block";
-        initMap(latitude, longitude);
+        // Show the map section if not visible and then initialize/update the map after a short delay
+        const mapSection = document.getElementById('mapSection');
+        if(mapSection.style.display === "none") {
+          mapSection.style.display = "block";
+        }
+        setTimeout(() => {
+          initMap(latitude, longitude);
+        }, 500);
       }, function(error) {
         showFeedback('Error capturing location: ' + error.message, 'danger');
       });
     });
     
-    // Download the Excel file with a dynamic filename (e.g. CT_4-2-2025.xlsx)
+    // Download Excel file with dynamic filename (e.g. CT_4-2-2025.xlsx)
     document.getElementById('downloadExcelBtn').addEventListener('click', function() {
       const today = new Date();
       const fileName = `CT_${today.getMonth() + 1}-${today.getDate()}-${today.getFullYear()}.xlsx`;
@@ -335,7 +341,7 @@
       XLSX.writeFile(newWorkbook, fileName);
     });
     
-    // Clear only the form fields (without affecting saved data)
+    // Clear form fields only (data remains saved)
     document.getElementById('clearBtn').addEventListener('click', function() {
       document.getElementById('idValue').value = '';
       document.getElementById('idType').selectedIndex = 0;
@@ -345,7 +351,7 @@
       showFeedback('Form fields have been cleared.', 'info');
     });
     
-    // Toggle dark/light mode for the entire app
+    // Toggle dark/light mode
     document.getElementById('toggleDarkMode').addEventListener('click', function() {
       document.body.classList.toggle('dark-mode');
       const icon = this.querySelector('i');
