@@ -29,6 +29,7 @@
       max-width: 1000px;
       width: 100%;
       transition: background 0.5s, color 0.5s;
+      position: relative;
     }
     .header {
       text-align: center;
@@ -56,6 +57,13 @@
     option[disabled][selected] {
       color: #6c757d;
     }
+    /* Toast container for notifications - adjusted to appear below header */
+    #toast-container {
+      position: fixed;
+      top: 80px;
+      right: 20px;
+      z-index: 1055;
+    }
     /* Dark Mode Adjustments */
     .dark-mode {
       background: #333;
@@ -79,11 +87,30 @@
       color: #eee;
     }
     .dark-mode .table-light {
-      background-color: #666;
+      background-color: #555 !important;
+      border-color: #666;
+    }
+    /* Additional dark mode styling for Recent Locations table */
+    .dark-mode #locationsTable thead th {
+      background-color: #555;
+      border-color: #666;
+    }
+    .dark-mode #locationsTable tbody tr {
+      background-color: #444;
+      color: #eee;
+      border-color: #666;
+    }
+    /* In dark mode, set header title to bold white */
+    .dark-mode .header h1 {
+      color: #fff;
+      font-weight: bold;
     }
   </style>
 </head>
 <body>
+  <!-- Toast Container for Notifications -->
+  <div id="toast-container"></div>
+  
   <div class="container animate__animated animate__fadeInDown">
     <header class="header">
       <h1>Coordinates Tracker</h1>
@@ -117,14 +144,11 @@
         <div class="mb-3">
           <label class="form-label">Location</label>
           <div class="row g-2">
-            <div class="col-3">
+            <div class="col-6">
               <input type="text" class="form-control" id="latitude" placeholder="Latitude" readonly>
             </div>
-            <div class="col-3">
-              <input type="text" class="form-control" id="longitude" placeholder="Longitude" readonly>
-            </div>
             <div class="col-6">
-              <input type="text" class="form-control" id="accuracy" placeholder="Accuracy (m)" readonly>
+              <input type="text" class="form-control" id="longitude" placeholder="Longitude" readonly>
             </div>
           </div>
         </div>
@@ -133,18 +157,20 @@
             <i class="fa-solid fa-location-arrow"></i> Add Location
           </button>
         </div>
-        <div class="d-flex gap-2 mb-3">
-          <button type="button" id="downloadExcelBtn" class="btn btn-success flex-fill">
+        <div class="d-grid gap-2 mb-3">
+          <button type="button" id="downloadExcelBtn" class="btn btn-success">
             <i class="fa-solid fa-file-excel"></i> Download Excel
           </button>
-          <button type="button" id="clearBtn" class="btn btn-secondary flex-fill">
+        </div>
+        <div class="d-grid gap-2 mb-3">
+          <button type="button" id="clearFieldsBtn" class="btn btn-secondary">
             <i class="fa-solid fa-eraser"></i> Clear Fields
           </button>
         </div>
       </form>
     </section>
     
-    <!-- Recent Locations Table -->
+    <!-- Recent Locations Section (Display Only) -->
     <section class="mt-4">
       <h5>Recent Locations</h5>
       <div class="table-responsive">
@@ -156,13 +182,17 @@
               <th>Date</th>
               <th>Latitude</th>
               <th>Longitude</th>
-              <th>Accuracy (m)</th>
             </tr>
           </thead>
           <tbody>
             <!-- Data rows inserted here -->
           </tbody>
         </table>
+      </div>
+      <div class="d-grid gap-2 mt-3">
+        <button type="button" id="clearRecentBtn" class="btn btn-danger">
+          <i class="fa-solid fa-trash"></i> Clear Recent Coordinates
+        </button>
       </div>
     </section>
     
@@ -171,39 +201,37 @@
       <h5>Instructions</h5>
       <ol>
         <li><strong>Upload Excel File (Optional):</strong> Load an existing Excel file if available. Otherwise, a new file will be created.</li>
-        <li><strong>Select ID Category and Enter Value:</strong> Choose a category (using the dropdown that starts with "Choose Category") and input the corresponding value.</li>
-        <li><strong>Add Location:</strong> Click the <strong>Add Location</strong> button to capture your current coordinates along with accuracy and date/time. The location will be added to the recent locations table.</li>
-        <li><strong>Download Excel:</strong> Click <strong>Download Excel</strong> to save the updated file. The file will be named as CT_&lt;date&gt; (e.g., CT_4-2-2025.xlsx).</li>
-        <li><strong>Clear Fields:</strong> Use the <strong>Clear Fields</strong> button to reset the form inputs without affecting the recorded Excel data.</li>
+        <li><strong>Select ID Category and Enter Value:</strong> Choose a category (using the dropdown that starts with "Choose Category") and input the corresponding value. The value field is required.</li>
+        <li><strong>Add Location:</strong> Click the <strong>Add Location</strong> button to capture your current coordinates along with the date/time. Each new press uses the current form values and updates the current coordinate.</li>
+        <li><strong>Download Excel:</strong> Click the <strong>Download Excel</strong> button to export only the current coordinate. If a file was uploaded, the current coordinate will be appended to its data.</li>
+        <li><strong>Clear Fields:</strong> Use the <strong>Clear Fields</strong> button to reset the form inputs without affecting stored data.</li>
+        <li><strong>Clear Recent Coordinates:</strong> Use the <strong>Clear Recent Coordinates</strong> button to remove all recent entries from the display.</li>
       </ol>
     </section>
     
-    <section id="feedback" class="mt-4"></section>
   </div>
   
   <!-- Bootstrap Bundle JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   
   <script>
-    // Global variable to hold Excel data (2D array for SheetJS)
-    let workbookData = [];
-    const headers = ["ID Category", "ID Value", "Date", "Latitude", "Longitude", "Accuracy (m)"];
+    // Global variables
+    let recentLocationsData = [];  // Data for UI display
+    let excelData = [];            // Holds data from uploaded file, if any
+    let currentCoordinate = null;  // The most recent coordinate
+    const headers = ["ID Category", "ID Value", "Date", "Latitude", "Longitude"];
     let fileUploaded = false;
     
-    // Load saved locations from localStorage if available; otherwise initialize with headers
-    if(localStorage.getItem('locationsData')) {
-      workbookData = JSON.parse(localStorage.getItem('locationsData'));
-    } else {
-      workbookData = [headers];
+    // Load recent locations from localStorage if available
+    if(localStorage.getItem('recentLocationsData')) {
+      recentLocationsData = JSON.parse(localStorage.getItem('recentLocationsData'));
     }
     
-    // Update the recent locations table and persist data
+    // Update Recent Locations Table UI
     function updateLocationsTable() {
       const tableBody = document.querySelector("#locationsTable tbody");
       tableBody.innerHTML = "";
-      // Loop starting at 1 to skip headers
-      for(let i = 1; i < workbookData.length; i++){
-        const row = workbookData[i];
+      recentLocationsData.forEach(row => {
         const tr = document.createElement("tr");
         row.forEach(cell => {
           const td = document.createElement("td");
@@ -211,19 +239,36 @@
           tr.appendChild(td);
         });
         tableBody.appendChild(tr);
-      }
-      localStorage.setItem('locationsData', JSON.stringify(workbookData));
+      });
+      localStorage.setItem('recentLocationsData', JSON.stringify(recentLocationsData));
     }
-    
     updateLocationsTable();
     
-    // Display feedback messages with animation
-    function showFeedback(message, type) {
-      const feedbackDiv = document.getElementById('feedback');
-      feedbackDiv.innerHTML = `<div class="alert alert-${type} animate__animated animate__fadeIn">${message}</div>`;
+    // Show a toast notification using Bootstrap Toasts
+    function showToast(message, type) {
+      const toastEl = document.createElement("div");
+      toastEl.className = `toast align-items-center text-bg-${type} border-0 animate__animated animate__fadeIn`;
+      toastEl.setAttribute("role", "alert");
+      toastEl.setAttribute("aria-live", "assertive");
+      toastEl.setAttribute("aria-atomic", "true");
+      toastEl.style.minWidth = "250px";
+      toastEl.innerHTML = `
+        <div class="d-flex">
+          <div class="toast-body">
+            ${message}
+          </div>
+          <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+      `;
+      document.getElementById("toast-container").appendChild(toastEl);
+      const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
+      toast.show();
+      toastEl.addEventListener('hidden.bs.toast', function () {
+        toastEl.remove();
+      });
     }
     
-    // Handle Excel file upload if provided by the user
+    // Handle Excel file upload
     document.getElementById('excelFile').addEventListener('change', function(e) {
       const file = e.target.files[0];
       if (!file) return;
@@ -233,78 +278,94 @@
         const workbook = XLSX.read(data, {type: 'array'});
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        workbookData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
-        if (workbookData.length === 0) {
-          workbookData = [headers];
+        excelData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+        if (excelData.length === 0) {
+          excelData = [headers];
         }
         fileUploaded = true;
-        updateLocationsTable();
-        showFeedback('Excel file loaded successfully!', 'success');
+        showToast('Excel file loaded successfully!', 'success');
       };
       reader.readAsArrayBuffer(file);
     });
     
-    // Add location: capture geolocation and update table
+    // Add Location: capture geolocation and update recent locations and currentCoordinate
     document.getElementById('addLocationBtn').addEventListener('click', function() {
       const idCategory = document.getElementById('idType').value;
+      const idValue = document.getElementById('idValue').value.trim();
       if (!idCategory) {
-        showFeedback('Please choose a category.', 'warning');
+        showToast('Please choose a category.', 'warning');
+        return;
+      }
+      if (idValue === "") {
+        showToast('Please enter a value for the selected category.', 'warning');
         return;
       }
       if (!navigator.geolocation) {
-        showFeedback('Geolocation is not supported by this browser.', 'warning');
+        showToast('Geolocation is not supported by this browser.', 'warning');
         return;
       }
       navigator.geolocation.getCurrentPosition(function(position) {
         const latitude = position.coords.latitude.toFixed(6);
         const longitude = position.coords.longitude.toFixed(6);
-        const accuracy = position.coords.accuracy.toFixed(2);
         document.getElementById('latitude').value = latitude;
         document.getElementById('longitude').value = longitude;
-        document.getElementById('accuracy').value = accuracy;
         
-        const idValue = document.getElementById('idValue').value.trim();
         const currentDate = new Date().toLocaleString();
-        const newRow = [idCategory, idValue, currentDate, latitude, longitude, accuracy];
+        currentCoordinate = [idCategory, idValue, currentDate, latitude, longitude];
         
-        // Avoid duplicate entries by comparing with the last row
-        if(workbookData.length > 1) {
-          const lastRow = workbookData[workbookData.length - 1];
-          if(JSON.stringify(lastRow) === JSON.stringify(newRow)) {
-            showFeedback("Duplicate location not added.", "warning");
-            return;
-          }
-        }
-        
-        workbookData.push(newRow);
+        // Add to recent locations (for UI display)
+        recentLocationsData.push(currentCoordinate);
         updateLocationsTable();
-        showFeedback('Location captured and added to the Excel data!', 'success');
+        showToast('Location captured and added!', 'success');
       }, function(error) {
-        showFeedback('Error capturing location: ' + error.message, 'danger');
+        showToast('Error capturing location: ' + error.message, 'danger');
       });
     });
     
-    // Download the Excel file with a dynamic filename (e.g. CT_4-2-2025.xlsx)
-    document.getElementById('downloadExcelBtn').addEventListener('click', function() {
+    // Export Excel: Export only the current coordinate using uploaded file data if available
+    function exportExcel() {
+      if (!currentCoordinate) {
+        showToast('No current coordinate to export.', 'warning');
+        return;
+      }
+      let exportData;
+      if (fileUploaded && excelData.length > 0) {
+        exportData = excelData.slice(); // copy uploaded file data
+        exportData.push(currentCoordinate);
+      } else {
+        exportData = [headers, currentCoordinate];
+      }
       const today = new Date();
       const fileName = `CT_${today.getMonth() + 1}-${today.getDate()}-${today.getFullYear()}.xlsx`;
       const newWorkbook = XLSX.utils.book_new();
-      const newWorksheet = XLSX.utils.aoa_to_sheet(workbookData);
+      const newWorksheet = XLSX.utils.aoa_to_sheet(exportData);
       XLSX.utils.book_append_sheet(newWorkbook, newWorksheet, "Coordinates");
       XLSX.writeFile(newWorkbook, fileName);
+      showToast('Excel file exported!', 'success');
+    }
+    
+    // Download Excel when the Download Excel button is clicked
+    document.getElementById('downloadExcelBtn').addEventListener('click', function() {
+      exportExcel();
     });
     
-    // Clear only the form fields (without affecting saved data)
-    document.getElementById('clearBtn').addEventListener('click', function() {
+    // Clear form fields (without affecting stored data)
+    document.getElementById('clearFieldsBtn').addEventListener('click', function() {
       document.getElementById('idValue').value = '';
       document.getElementById('idType').selectedIndex = 0;
       document.getElementById('latitude').value = '';
       document.getElementById('longitude').value = '';
-      document.getElementById('accuracy').value = '';
-      showFeedback('Form fields have been cleared.', 'info');
+      showToast('Form fields have been cleared.', 'info');
     });
     
-    // Toggle dark/light mode for the entire app
+    // Clear recent locations from UI and localStorage
+    document.getElementById('clearRecentBtn').addEventListener('click', function() {
+      recentLocationsData = [];
+      updateLocationsTable();
+      showToast('Recent coordinates cleared.', 'info');
+    });
+    
+    // Toggle dark/light mode
     document.getElementById('toggleDarkMode').addEventListener('click', function() {
       document.body.classList.toggle('dark-mode');
       const icon = this.querySelector('i');
