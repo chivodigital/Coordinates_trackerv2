@@ -12,9 +12,6 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <!-- SheetJS (XLSX) Library -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-  <!-- Leaflet CSS for map -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
-        integrity="sha256-sA+M3b/2v4ZgkJymj+c+zIBtrHjOAd9Gg4WsM6Pnu9g=" crossorigin=""/>
   <style>
     body {
       background: linear-gradient(135deg, #74ebd5, #ACB6E5);
@@ -58,11 +55,6 @@
     /* Style for the default dropdown option */
     option[disabled][selected] {
       color: #6c757d;
-    }
-    #map {
-      height: 300px;
-      border-radius: 8px;
-      margin-top: 20px;
     }
     /* Dark Mode Adjustments */
     .dark-mode {
@@ -152,12 +144,6 @@
       </form>
     </section>
     
-    <!-- Map Section (initially hidden) -->
-    <section id="mapSection" style="display: none;">
-      <h5>Location Map</h5>
-      <div id="map"></div>
-    </section>
-    
     <!-- Recent Locations Table -->
     <section class="mt-4">
       <h5>Recent Locations</h5>
@@ -186,7 +172,7 @@
       <ol>
         <li><strong>Upload Excel File (Optional):</strong> Load an existing Excel file if available. Otherwise, a new file will be created.</li>
         <li><strong>Select ID Category and Enter Value:</strong> Choose a category (using the dropdown that starts with "Choose Category") and input the corresponding value.</li>
-        <li><strong>Add Location:</strong> Click the <strong>Add Location</strong> button to capture your current coordinates along with accuracy and date/time. The location will be displayed on the map and added to the recent locations table.</li>
+        <li><strong>Add Location:</strong> Click the <strong>Add Location</strong> button to capture your current coordinates along with accuracy and date/time. The location will be added to the recent locations table.</li>
         <li><strong>Download Excel:</strong> Click <strong>Download Excel</strong> to save the updated file. The file will be named as CT_&lt;date&gt; (e.g., CT_4-2-2025.xlsx).</li>
         <li><strong>Clear Fields:</strong> Use the <strong>Clear Fields</strong> button to reset the form inputs without affecting the recorded Excel data.</li>
       </ol>
@@ -197,10 +183,6 @@
   
   <!-- Bootstrap Bundle JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <!-- Leaflet JS for map -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" 
-          integrity="sha256-o9N1j7qST9z3n1qf4o7p2cHfS7kgtKepJDX1pGgInWM=" 
-          crossorigin=""></script>
   
   <script>
     // Global variable to hold Excel data (2D array for SheetJS)
@@ -241,27 +223,7 @@
       feedbackDiv.innerHTML = `<div class="alert alert-${type} animate__animated animate__fadeIn">${message}</div>`;
     }
     
-    // Initialize or update the Leaflet map to display the captured location
-    let map, marker;
-    function initMap(lat, lng) {
-      lat = parseFloat(lat);
-      lng = parseFloat(lng);
-      if(!map) {
-        map = L.map('map').setView([lat, lng], 15);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19,
-        }).addTo(map);
-      }
-      if(marker) {
-        marker.setLatLng([lat, lng]);
-      } else {
-        marker = L.marker([lat, lng]).addTo(map);
-      }
-      map.setView([lat, lng], 15);
-      setTimeout(() => { if(map) map.invalidateSize(); }, 500);
-    }
-    
-    // Handle Excel file upload
+    // Handle Excel file upload if provided by the user
     document.getElementById('excelFile').addEventListener('change', function(e) {
       const file = e.target.files[0];
       if (!file) return;
@@ -282,7 +244,7 @@
       reader.readAsArrayBuffer(file);
     });
     
-    // Add location: capture geolocation and update table & map
+    // Add location: capture geolocation and update table
     document.getElementById('addLocationBtn').addEventListener('click', function() {
       const idCategory = document.getElementById('idType').value;
       if (!idCategory) {
@@ -317,21 +279,12 @@
         workbookData.push(newRow);
         updateLocationsTable();
         showFeedback('Location captured and added to the Excel data!', 'success');
-        
-        // Show the map section if not visible and then initialize/update the map after a short delay
-        const mapSection = document.getElementById('mapSection');
-        if(mapSection.style.display === "none") {
-          mapSection.style.display = "block";
-        }
-        setTimeout(() => {
-          initMap(latitude, longitude);
-        }, 500);
       }, function(error) {
         showFeedback('Error capturing location: ' + error.message, 'danger');
       });
     });
     
-    // Download Excel file with dynamic filename (e.g. CT_4-2-2025.xlsx)
+    // Download the Excel file with a dynamic filename (e.g. CT_4-2-2025.xlsx)
     document.getElementById('downloadExcelBtn').addEventListener('click', function() {
       const today = new Date();
       const fileName = `CT_${today.getMonth() + 1}-${today.getDate()}-${today.getFullYear()}.xlsx`;
@@ -341,7 +294,7 @@
       XLSX.writeFile(newWorkbook, fileName);
     });
     
-    // Clear form fields only (data remains saved)
+    // Clear only the form fields (without affecting saved data)
     document.getElementById('clearBtn').addEventListener('click', function() {
       document.getElementById('idValue').value = '';
       document.getElementById('idType').selectedIndex = 0;
@@ -351,7 +304,7 @@
       showFeedback('Form fields have been cleared.', 'info');
     });
     
-    // Toggle dark/light mode
+    // Toggle dark/light mode for the entire app
     document.getElementById('toggleDarkMode').addEventListener('click', function() {
       document.body.classList.toggle('dark-mode');
       const icon = this.querySelector('i');
